@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+</head>
+
+<body>
+  <div class="sidebar">
+    <h2> Class and Data Settings</h2>
+
+    <p>After entering the required infos, click the update button to upload grades to classroom</p>
+
+    <div class="block form-group">
+      <label for="course">Enter the course name or choose from the list
+        (Click the button to get your course list from classroom) </label><br>
+      <input id="course" type="text" placeholder="Course title.." value="" />
+      <br>
+      <button for="selectCourse" class="blue"
+        id="buttonGetCourses"
+        onClick="getCourseList(this);">
+        CourseList
+      </button>
+      <select id="selectCourse" onchange="selectItem(this)" disabled>
+        <option>No courses </option>
+      </select>
+    </div>
+    <div class="block form-group">
+      <label for="assignment">The assignment name </label><br>
+      <input id="assignment" type="text" placeholder="Assignment title"
+        value="" /><br>
+      <input type="checkbox" id="create-assignment" />
+      <label for="create-assignment"> Create new assignment </label>
+    </div>
+
+    <div class="block form-group">
+      <label for="range">Enter a range of two columns(emails-grades). For example, A1:B100 or [A1:A100, B1:B100], or [A, B]
+      </label> <br>
+      <input id="range" type="text" onClick="getSelectedRange(this);" placeholder="Specify Range.." value="" />
+    </div>
+
+    <div class="block form-group">
+      <input type="checkbox" id="return-grades">
+      <label for="return-grades">
+        Also return grades to students</label><br>
+      <button class="blue" id="upload-grades" onClick="uploadGradesToClassroom(this);">
+        UploadGrades</button>
+      <br>
+      <label for="upload-grades" id="status" style.display="none">
+        status </label><br>
+    </div>
+    <div class="block form-group">
+      <br><br><br><br>
+      <span class="gray">
+      <a href="https://github.com/adaskin/grades-fromsheet-toclassroom/issues">report issues</a></span>
+    </div>
+  </div>
+</body>
+<script>
+  //update course name field from dropdownlist
+function selectItem(select) {
+  var course = document.getElementById("course");
+  course.innerHTML = select.options[select.selectedIndex].text;
+  course.value = select.options[select.selectedIndex].text;
+}
+
+/**
+ * get course list request to  appscript
+ */
+function getCourseList(button) {
+  button.innerHTML = "Getting Courses..."; // Change the button value while getting range
+  button.disabled = true;         // Disable the button while getting range
+  google.script.run
+    .withSuccessHandler(updateCourseListSuccessHandler)
+    .withUserObject(button)           
+    .getCourseList();                  // get request to Apps Sript
+  return;
+}
+
+// Function to be called on success
+function updateCourseListSuccessHandler(list, button) {
+  button.innerHTML = "courses updating.."; // Reset the button value
+  list = JSON.parse(list);
+  var selectCourse = document.getElementById("selectCourse");
+  button.innerHTML = "selecting."; // Reset the button value
+  while (selectCourse.options.length) {
+    selectCourse.remove(0);
+  }
+
+  if (list) {
+    button.innerHTML = "adding."; // Reset the button value
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var course = new Option(list[i], list[i]);
+      selectCourse.options.add(course);
+    }
+
+    button.innerHTML = "added."; // Reset the button value
+    document.getElementById("course").value = list[0];
+  }
+  selectCourse.disabled = false;
+  button.innerHTML = "Renew Course List"; // Reset the button value
+  button.disabled = false;
+}
+
+
+/////////////////////////////////////////////////
+var secondClick = false;
+/**
+ * get selected range from app script
+ */
+function getSelectedRange(event) {
+  var range = document.getElementById('course');
+  if (!secondClick) {
+    secondClick = true;
+    google.script.run
+      .withSuccessHandler(updateRangeTextField)
+      .withUserObject(range)   // To pass the event element object
+      .getSelectedRangeAsJSON(); // get selected range from  app script
+  } else if (textField.value == "") {
+    secondClick = false;
+  }
+}
+//update  text field
+function updateRangeTextField(text, textField) {
+  var range = document.getElementById("range");
+  range.innerHTML = text;
+  range.value = text;
+}
+////////////////////////////////////////////////////////
+/**
+ * post request to appscript
+ * the  JSON of the following is sent
+ * data = {
+    'course': course,
+    'assignment': assignment,
+    'range': 'A1:B100',//a range of two columns
+    'createAssignment': createAssignment,
+    'assignedGrade': assignedGrade
+  }
+ */
+function uploadGradesToClassroom(button) {
+
+  var status = document.getElementById("status");
+  status.innerHTML = 'The following grades are uploading...\n';
+  var course = document.getElementById("course").value;
+  var assignment = document.getElementById("assignment").value;
+  var range = document.getElementById("range").value;
+  var returnGrades = document.getElementById("return-grades").value;
+  var createAssignment = document.getElementById("create-assignment").checked;
+
+  var data = {
+    'course': course,
+    'assignment': assignment,
+    'range': range,
+    'createAssignment': createAssignment,
+    'returnGrades': returnGrades//whether to return to students
+  };
+
+  button.innerHTML = "Sending Grade Courses..."; 
+  button.disabled = true;   
+
+  google.script.run
+    .withSuccessHandler(uploadRequestSuccessHandle)
+    .withFailureHandler(uploadRequestFailureHandle)
+    .withUserObject(button)                          // pass the event element object
+    .uploadGradesToClassroom(JSON.stringify(data)); // post request to Apps Sript
+  return;
+}
+
+function uploadRequestSuccessHandle(unsuccessList, button) {
+  button.innerHTML = 'UploadGrades';
+  button.disabled = false;
+  var status = document.getElementById("status");
+  status.innerHTML = 'The grades are updated!!!';
+}
+
+function uploadRequestFailureHandle(unsuccessList, button) {
+  button.innerHTML = 'UploadGrades';
+  button.disabled = false;
+  var status = document.getElementById("status");
+  status.innerHTML = 'The upload is failed.';
+}
+///////////////////////////////////////////////////////////////////////
+</script>
+
+</html>
